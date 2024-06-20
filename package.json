@@ -10,6 +10,7 @@
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^9.4.0",
+    "@figma/plugin-typings": "^1.95.0",
     "@types/eslint__js": "^8.42.3",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
@@ -34,5 +35,8 @@
   "bugs": {
     "url": "https://github.com/Figma2Roblox/core-api/issues"
   },
-  "homepage": "https://github.com/Figma2Roblox/core-api#readme"
+  "homepage": "https://github.com/Figma2Roblox/core-api#readme",
+  "dependencies": {
+    "@figma2rbx/rbx-ui": "file:../../../Users/zoe play/figma2rbx-rbx-ui-1.0.0.tgz"
+  }
 }
