@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "lib": [
+      "es2017",
+      "dom"
+    ],
+    "strict": true,
+    "outDir": "dist",
+    "declaration": true,
+  },
+  "include": [
+    "src/**/*",
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

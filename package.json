@@ -1,0 +1,38 @@
+{
+  "name": "@figma2rbx/core-api",
+  "version": "1.0.0",
+  "description": "core API responsible for managing rules, code generation templates, and custom components",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "author": "crossstarcross",
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^9.4.0",
+    "@types/eslint__js": "^8.42.3",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-no-autofix": "^2.0.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "eslint-plugin-simple-import-sort": "^12.1.0",
+    "prettier": "^3.3.2",
+    "typescript": "^5.4.5",
+    "typescript-eslint": "^7.12.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "watch": "npm run build -- --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Figma2Roblox/core-api.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Figma2Roblox/core-api/issues"
+  },
+  "homepage": "https://github.com/Figma2Roblox/core-api#readme"
+}
