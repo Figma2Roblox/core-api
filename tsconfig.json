@@ -1,25 +1,24 @@
 {
   "compilerOptions": {
+    "esModuleInterop": true,
     "target": "es6",
     "lib": [
       "es2017",
       "dom"
     ],
-    "typeRoots": [
-      "./node_modules/@types",
-      "./node_modules/@figma",
-    ],
     "strict": true,
     "outDir": "dist",
     "declaration": true,
-    "module": "nodenext",
-    "moduleResolution": "nodenext"
+    "module": "CommonJS",
+    // "moduleResolution": "nodenext"
   },
   "include": [
-    "src",
+    "src/**/*",
   ],
   "exclude": [
-    "node_modules",
-    "dist"
+    "node_modules/**/*",
+    "dist/**/*",
   ]
+
+  
 }
