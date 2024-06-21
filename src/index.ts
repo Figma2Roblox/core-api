@@ -1,11 +1,4 @@
-import {
-	GetAppearanceRuleReturnType,
-	GetElementRuleReturnType,
-	RuleConfig,
-	RuleSignature,
-	signatureSymbol,
-	TypeEvaluator,
-} from "./types/rules";
+import { RuleConfig, RuleSignature, signatureSymbol, GetEvaluatorSignature } from "./types/rules";
 
 function upperFirst(str: string): string {
 	return str.charAt(0).toUpperCase() + str.slice(1);
@@ -122,7 +115,7 @@ function hasCircularDependency(ruleId: string, visited: Set<string>, stack: Set<
 
 export function addElementRule<Config extends RuleConfig>(
 	config: Config,
-	evaluator: TypeEvaluator<Config, GetElementRuleReturnType<Config>>,
+	evaluator: GetEvaluatorSignature<Config>,
 ): RuleSignature {
 	if ("evaluateAfter" in config && config.evaluateAfter) {
 		simpleCheckDependenices("after", "element", (config as Config).name, config.evaluateAfter);
@@ -148,7 +141,7 @@ export function addElementRule<Config extends RuleConfig>(
 export function addAppearanceRule<Config extends RuleConfig>(
 	groupName: string,
 	config: Config,
-	evaluator: TypeEvaluator<Config, GetAppearanceRuleReturnType<Config>>,
+	evaluator: GetEvaluatorSignature<Config>,
 ): RuleSignature {
 	if ("evaluateAfter" in config && config.evaluateAfter !== undefined) {
 		simpleCheckDependenices("after", "appearance", config.name, config.evaluateAfter);
