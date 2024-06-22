@@ -1,4 +1,13 @@
-import { RuleConfig, RuleSignature, signatureSymbol, GetEvaluatorSignature } from "./types/rules";
+import {
+	AppearanceEvaluator,
+	AppearanceRuleConfig,
+	ElementEvaluator,
+	ElementRuleConfig,
+	RuleSignature,
+	signatureSymbol,
+} from "./typesApi";
+
+type RuleConfig = ElementRuleConfig | AppearanceRuleConfig;
 
 function upperFirst(str: string): string {
 	return str.charAt(0).toUpperCase() + str.slice(1);
@@ -9,7 +18,9 @@ type InternalRule = {
 	name: string;
 	evaluator: (...args: any[]) => any;
 	signatureId: string;
-	dependencies?: Set<string>;
+	dependencies: Set<string>;
+	propertyDependencies: Set<string>;
+	appearanceGroup?: string;
 };
 
 export const anyRuleBySignature: { [key: string]: InternalRule } = {};
@@ -21,11 +32,10 @@ function createRuleSingature(name: string, appearanceGroup?: string): RuleSignat
 		name: name,
 		symbol: signatureSymbol,
 		signatureId: crypto.randomUUID(),
-		appearanceGroup: appearanceGroup,
 	};
 }
 
-function simpleCheckDependenices(
+function checkDependencyArray(
 	errorVerb: string,
 	ruleType: "element" | "appearance",
 	thisRuleName: string,
@@ -51,42 +61,68 @@ function simpleCheckDependenices(
 	}
 }
 
-function checkGroupDependencies(
-	errorVerb: string,
-	thisRuleName: string,
-	thisRuleGroup: string,
-	dependencies: RuleSignature[],
-) {
-	for (const signature of dependencies) {
-		if (signature.appearanceGroup !== thisRuleGroup) {
-			throw new Error(
-				`Appearance rule '${thisRuleName}' cannot be evaluated ${errorVerb} rule '${signature.name}': '${thisRuleName}' belongs to appearance group '${thisRuleGroup}', while '${signature.name}' belongs to appearance group '${signature.appearanceGroup}'`,
-			);
-		}
+function assertDependencies(config: RuleConfig, ruleType: "element" | "appearance") {
+	if (config.evaluatesAfter) {
+		checkDependencyArray("after", ruleType, config.name, config.evaluatesAfter);
+	}
+	if (config.evaluatesBefore) {
+		checkDependencyArray("before", ruleType, config.name, config.evaluatesBefore);
 	}
 }
 
-function processDependencies(config: RuleConfig, ruleType: "element" | "appearance", signature: RuleSignature) {
-	const dependencies: Set<string> | undefined = config.evaluateAfter
-		? new Set(config.evaluateAfter?.map(sig => sig.signatureId))
-		: undefined;
-
-	config.evaluateBefore?.forEach(dependentSig => {
-		if (dependencies?.has(dependentSig.signatureId)) {
+function checkGroupDependency(
+	thisRuleName: string,
+	thisRuleGroup: string,
+	dependencies: RuleSignature[],
+	errorVerb: string,
+) {
+	dependencies.forEach(otherRuleSignature => {
+		const otherRule = anyRuleBySignature[otherRuleSignature.signatureId];
+		if (otherRule.appearanceGroup !== thisRuleGroup) {
 			throw new Error(
-				`${upperFirst(ruleType)} rule '${config.name}' cannot be evaluated before and after rule '${dependentSig.name}'`,
+				`Appearance rule '${thisRuleName}' cannot be evaluated ${errorVerb} rule '${otherRule.name}': '${thisRuleName}' belongs to appearance group '${thisRuleGroup}', while '${otherRule.name}' belongs to appearance group '${otherRule.appearanceGroup}'`,
+			);
+		}
+	});
+}
+
+function assertSameGroupAsDependencies(config: AppearanceRuleConfig, thisRuleGroup: string) {
+	if (config.evaluatesAfter) {
+		checkGroupDependency(config.name, thisRuleGroup, config.evaluatesAfter, "after");
+	}
+	if (config.evaluatesBefore) {
+		checkGroupDependency(config.name, thisRuleGroup, config.evaluatesBefore, "before");
+	}
+}
+
+function getMyDependenciesAndUpdateOthers(config: RuleConfig, thisSignature: RuleSignature) {
+	const thisRulePropertyDependencies: Set<string> = new Set();
+	const thisRuleDependencies: Set<string> = new Set();
+
+	config.getsPropertiesFrom?.forEach(otherRuleSignature => {
+		thisRuleDependencies.add(otherRuleSignature.signatureId);
+		thisRulePropertyDependencies.add(otherRuleSignature.signatureId);
+	});
+
+	config.evaluatesAfter?.forEach(otherRuleSignature => {
+		thisRuleDependencies.add(otherRuleSignature.signatureId);
+	});
+
+	// Update rules that this rule must be evaluated before to include this rule
+	// as a dependency. This makes the topological sorting of the rules by
+	// evaluation & property dependency easier.
+	config.evaluatesBefore?.forEach(otherRuleSignature => {
+		if (thisRuleDependencies.has(otherRuleSignature.signatureId)) {
+			throw new Error(
+				`Rule '${config.name}' cannot be evaluated before and after rule '${otherRuleSignature.name}'`,
 			);
 		}
 
-		const dependentRule = anyRuleBySignature[dependentSig.signatureId];
-		if (!dependentRule.dependencies) {
-			dependentRule.dependencies = new Set([signature.signatureId]);
-		} else if (!dependentRule.dependencies.has(signature.signatureId)) {
-			dependentRule.dependencies.add(signature.signatureId);
-		}
+		const otherRule = anyRuleBySignature[otherRuleSignature.signatureId];
+		otherRule.dependencies.add(thisSignature.signatureId);
 	});
 
-	return dependencies;
+	return [thisRuleDependencies, thisRulePropertyDependencies];
 }
 
 function hasCircularDependency(ruleId: string, visited: Set<string>, stack: Set<string>): boolean {
@@ -113,23 +149,21 @@ function hasCircularDependency(ruleId: string, visited: Set<string>, stack: Set<
 	return false;
 }
 
-export function addElementRule<Config extends RuleConfig>(
+export function addElementRule<Config extends ElementRuleConfig>(
 	config: Config,
-	evaluator: GetEvaluatorSignature<Config>,
+	evaluator: ElementEvaluator<Config>,
 ): RuleSignature {
-	if ("evaluateAfter" in config && config.evaluateAfter) {
-		simpleCheckDependenices("after", "element", (config as Config).name, config.evaluateAfter);
-	} else if ("evaluateBefore" in config && config.evaluateBefore !== undefined) {
-		simpleCheckDependenices("before", "element", config.name, config.evaluateBefore);
-	}
+	assertDependencies(config, "element");
 
 	const signature = createRuleSingature(config.name);
+	const [dependencies, propertyDependencies] = getMyDependenciesAndUpdateOthers(config, signature);
 	const internalRule: InternalRule = {
 		name: config.name,
 		ruleType: "element",
 		evaluator: evaluator,
 		signatureId: signature.signatureId,
-		dependencies: processDependencies(config, "element", signature),
+		dependencies: dependencies,
+		propertyDependencies: propertyDependencies,
 	};
 
 	anyRuleBySignature[signature.signatureId] = internalRule;
@@ -138,26 +172,24 @@ export function addElementRule<Config extends RuleConfig>(
 	return signature;
 }
 
-export function addAppearanceRule<Config extends RuleConfig>(
+export function addAppearanceRule<Config extends AppearanceRuleConfig>(
 	groupName: string,
 	config: Config,
-	evaluator: GetEvaluatorSignature<Config>,
+	evaluator: AppearanceEvaluator<Config>,
 ): RuleSignature {
-	if ("evaluateAfter" in config && config.evaluateAfter !== undefined) {
-		simpleCheckDependenices("after", "appearance", config.name, config.evaluateAfter);
-		checkGroupDependencies("after", config.name, groupName, config.evaluateAfter);
-	} else if ("evaluateBefore" in config && config.evaluateBefore !== undefined) {
-		simpleCheckDependenices("before", "appearance", config.name, config.evaluateBefore);
-		checkGroupDependencies("before", config.name, groupName, config.evaluateBefore);
-	}
+	assertDependencies(config, "appearance");
+	assertSameGroupAsDependencies(config, groupName);
 
 	const signature = createRuleSingature(config.name, groupName);
+	const [dependencies, propertyDependencies] = getMyDependenciesAndUpdateOthers(config, signature);
+
 	const internalRule: InternalRule = {
 		name: config.name,
 		ruleType: "appearance",
 		evaluator: evaluator,
 		signatureId: signature.signatureId,
-		dependencies: processDependencies(config, "appearance", signature),
+		dependencies: dependencies,
+		propertyDependencies: propertyDependencies,
 	};
 
 	anyRuleBySignature[signature.signatureId] = internalRule;
@@ -196,6 +228,7 @@ export function orderRulesByDependencies(unorderedRules: InternalRule[]): Intern
 	const orderedRules: InternalRule[] = [];
 	const ruleVisitedById: { [key: string]: true } = {};
 
+	// DFS Topological sort
 	while (orderedRules.length < unorderedRules.length) {
 		for (const rule of unorderedRules) {
 			if (ruleVisitedById[rule.signatureId]) {
@@ -216,13 +249,10 @@ export function orderRulesByDependencies(unorderedRules: InternalRule[]): Intern
 			if (dependenciesOrdered) {
 				ruleVisitedById[rule.signatureId] = true;
 				orderedRules.push(rule);
-				// Once this rule is ordered we want to start from the beginning to order rules that have a dependency on this rule
 				break;
 			}
 		}
 	}
-
-	console.log("Done sorting");
 
 	return orderedRules;
 }
